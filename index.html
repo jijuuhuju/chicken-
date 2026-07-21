@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚠️ EMERGENCY: CHICKEN PANDEMIC ⚠️</title>
+    
+    <!-- 🐔 ファビコン設定 -->
+    <link rel="icon" href="chicken.ico" type="image/x-icon">
+    
+    <style>
+        body {
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+            background: #000;
+            color: #ff3333;
+            padding-top: 100px;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            transition: background-color 0.05s;
+            user-select: none;
+        }
+        h1 { font-size: 2.5rem; text-shadow: 0 0 10px #ff0000; }
+        p { font-size: 1.2rem; color: #fff; }
+        
+        .virus-btn {
+            font-size: 5rem;
+            background: #ff3333;
+            border: 4px solid #fff;
+            border-radius: 50%;
+            width: 180px;
+            height: 180px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff0000;
+            transition: transform 0.1s;
+            outline: none;
+            margin-top: 50px;
+            z-index: 10;
+            position: relative;
+        }
+        .virus-btn:active { transform: scale(0.9); }
+
+        /* 超高速・凶悪画面シェイク */
+        @keyframes violentShake {
+            0% { transform: translate(5px, 5px) rotate(0deg); }
+            10% { transform: translate(-5px, -8px) rotate(-3deg); }
+            20% { transform: translate(-10px, 0px) rotate(3deg); }
+            30% { transform: translate(0px, 8px) rotate(0deg); }
+            40% { transform: translate(5px, -5px) rotate(3deg); }
+            50% { transform: translate(-5px, 8px) rotate(-3deg); }
+            60% { transform: translate(-10px, 5px) rotate(0deg); }
+            70% { transform: translate(8px, 5px) rotate(-3deg); }
+            80% { transform: translate(-5px, -5px) rotate(3deg); }
+            90% { transform: translate(8px, 8px) rotate(0deg); }
+            100% { transform: translate(5px, -8px) rotate(-3deg); }
+        }
+        .shaking { animation: violentShake 0.05s infinite; }
+
+        /* 中央から飛ぶファビコン */
+        .flying-favicon {
+            position: absolute;
+            z-index: 2;
+            pointer-events: none;
+            animation: flyAway 1.5s linear forwards;
+        }
+        @keyframes flyAway {
+            0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(var(--scale)); opacity: 0; }
+        }
+
+        /* 🌟 マウス位置から大爆発するチキン粒のスタイル */
+        .mouse-explosion-particle {
+            position: absolute;
+            z-index: 999; /* 最前面で爆発 */
+            pointer-events: none;
+            animation: explodeParticle 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+        @keyframes explodeParticle {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+            100% { transform: translate(var(--ex), var(--ey)) rotate(var(--erot)) scale(0.2); opacity: 0; }
+        }
+    </style>
+</head>
+<body id="virus-body">
+
+    <h1>⚠️ SYSTEM INFECTED ⚠️</h1>
+    <p>CHICKEN VIRUS が検出されました。絶対にボタンに触れないでください。</p>
+    
+    <button class="virus-btn" id="trigger-btn">🐔</button>
+
+    <script>
+        const chickenSounds = ['chicken1.mp3', 'chicken2.mp3', 'chicken3.mp3'];
+        const btn = document.getElementById('trigger-btn');
+        const body = document.getElementById('virus-body');
+        
+        let isInfected = false;
+
+        // 画面の高速点滅
+        function startFlashing() {
+            const colors = ['#ff0000', '#000000', '#ffff00', '#ff0055'];
+            setInterval(() => {
+                body.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            }, 60);
+        }
+
+        // 中央からファビコンを吹き飛ばす
+        function spawnFlyingFavicon() {
+            const img = document.createElement('img');
+            img.src = 'chicken.ico';
+            img.className = 'flying-favicon';
+            img.style.left = (window.innerWidth / 2 - 25) + 'px';
+            img.style.top = (window.innerHeight / 2 + 50) + 'px';
+
+            const size = Math.floor(Math.random() * 90) + 30;
+            img.style.width = size + 'px'; img.style.height = size + 'px';
+
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.floor(Math.random() * 400) + 300;
+            img.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+            img.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+            img.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+            img.style.setProperty('--scale', (Math.random() * 1.5 + 0.5));
+
+            body.appendChild(img);
+            setTimeout(() => { img.remove(); }, 1500);
+        }
+
+        // 🌟 マウスの位置からチキンを大爆発させる関数
+        function createMouseExplosion(e) {
+            if (!isInfected) return; // 発症前は爆発しない
+
+            // 1回のマウス移動につき5粒のチキンを四方八方に爆破
+            for (let i = 0; i < 5; i++) {
+                const particle = document.createElement('img');
+                particle.src = 'chicken.ico';
+                particle.className = 'mouse-explosion-particle';
+                
+                // マウスのジャスト位置に配置（中心を合わせるため20px引く）
+                particle.style.left = (e.clientX - 20) + 'px';
+                particle.style.top = (e.clientY - 20) + 'px';
+                particle.style.width = '40px';
+                particle.style.height = '40px';
+
+                // 爆発のランダムな飛散ベクトルを計算
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.floor(Math.random() * 150) + 50; // 飛び散る勢い
+                const ex = Math.cos(angle) * speed + 'px';
+                const ey = Math.sin(angle) * speed + 'px';
+                const erot = (Math.random() * 360 - 180) + 'deg';
+
+                particle.style.setProperty('--ex', ex);
+                particle.style.setProperty('--ey', ey);
+                particle.style.setProperty('--erot', erot);
+
+                body.appendChild(particle);
+
+                // 0.6秒の爆発アニメーション終了後に消滅
+                setTimeout(() => { particle.remove(); }, 600);
+            }
+        }
+
+        // 音声パンデミック
+        function startAudioPandemic() {
+            function scheduleNextSound() {
+                const randomIndex = Math.floor(Math.random() * chickenSounds.length);
+                const audio = new Audio(chickenSounds[randomIndex]);
+                audio.volume = 1.0; 
+                audio.play().catch(err => console.log("再生ブロック"));
+
+                const nextDelay = Math.floor(Math.random() * (1000 - 300 + 1)) + 300;
+                setTimeout(scheduleNextSound, nextDelay);
+            }
+            scheduleNextSound();
+            scheduleNextSound();
+        }
+
+        // 発症トリガー
+        btn.addEventListener('click', () => {
+            if (isInfected) return;
+            isInfected = true;
+
+            body.classList.add('shaking');
+            startFlashing();
+            startAudioPandemic();
+            
+            // 定期的なファビコンバースト
+            setInterval(spawnFlyingFavicon, 200);
+
+            // 🌟 マウス移動イベントに爆発を紐付け
+            window.addEventListener('mousemove', createMouseExplosion);
+
+            document.querySelector('p').innerHTML = "<span style='color:white; font-weight:bold; background:red; padding:5px;'>手遅れです。ブラウザのタブを閉じて強制終了してください！</span>";
+            btn.textContent = '💀';
+            btn.style.background = '#000';
+        });
+    </script>
+</body>
+</html>

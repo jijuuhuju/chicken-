@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チキン</title>
+    <title>チキン・ファイターズ</title>
     
     <!-- 🐔 ファビコン設定 -->
     <link rel="icon" href="chicken.ico" type="image/x-icon">
     
     <style>
-        /* 初期の無害な画面スタイル */
         body {
-            background-color: #ffffff;
+            background-color: #ffe0b2; /* ケンカの舞台っぽい土・砂色のイメージ */
             margin: 0;
             overflow: hidden;
             height: 100vh;
@@ -19,179 +18,190 @@
             justify-content: center;
             align-items: center;
             font-family: 'Helvetica Neue', Arial, sans-serif;
-            cursor: pointer; /* どこを押してもいいように全体をカーソル化 */
+            cursor: pointer;
             user-select: none;
-            transition: background-color 0.05s;
+            position: relative;
         }
 
-        /* 「画面をタップして」という静かな指示 */
+        /* 画面をタップして */
         .instruction {
             font-size: 1.8rem;
-            color: #555555;
+            color: #d84315;
             font-weight: bold;
             letter-spacing: 2px;
-            animation: pulse 2s infinite; /* じんわり点滅させてタップを促す */
+            animation: pulse 1.5s infinite;
+            z-index: 100;
         }
-
         @keyframes pulse {
             0% { opacity: 0.4; }
             50% { opacity: 1; }
             100% { opacity: 0.4; }
         }
 
-        /* タップ後の凶悪な超高速画面シェイク */
-        @keyframes violentShake {
-            0% { transform: translate(5px, 5px) rotate(0deg); }
-            10% { transform: translate(-5px, -8px) rotate(-3deg); }
-            20% { transform: translate(-10px, 0px) rotate(3deg); }
-            30% { transform: translate(0px, 8px) rotate(0deg); }
-            40% { transform: translate(5px, -5px) rotate(3deg); }
-            50% { transform: translate(-5px, 8px) rotate(-3deg); }
-            60% { transform: translate(-10px, 5px) rotate(0deg); }
-            70% { transform: translate(8px, 5px) rotate(-3deg); }
-            80% { transform: translate(-5px, -5px) rotate(3deg); }
-            90% { transform: translate(8px, 8px) rotate(0deg); }
-            100% { transform: translate(5px, -8px) rotate(-3deg); }
-        }
-        .shaking { animation: violentShake 0.05s infinite; }
-
-        /* 四方八方に吹き飛ぶチキン（ファビコン画像） */
-        .flying-favicon {
+        /* 走り回るニワトリ（chicken.ico）のスタイル */
+        .chicken-fighter {
             position: absolute;
-            z-index: 2;
-            pointer-events: none;
-            animation: flyAway 1.5s linear forwards;
-        }
-        @keyframes flyAway {
-            0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 1; }
-            100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(var(--scale)); opacity: 0; }
+            width: 60px;
+            height: 60px;
+            z-index: 10;
+            will-change: transform;
+            transition: transform 0.1s linear;
         }
 
-        /* マウス移動・指のドラッグで大爆発するチキンの粒 */
-        .mouse-explosion-particle {
+        /* 衝突したときに出る喧嘩エフェクト（💥） */
+        .clash-effect {
             position: absolute;
-            z-index: 999;
+            font-size: 3rem;
+            z-index: 50;
             pointer-events: none;
-            animation: explodeParticle 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            animation: clashPop 0.3s ease-out forwards;
         }
-        @keyframes explodeParticle {
-            0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
-            100% { transform: translate(var(--ex), var(--ey)) rotate(var(--erot)) scale(0.2); opacity: 0; }
+        @keyframes clashPop {
+            0% { transform: scale(0.3); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
         }
     </style>
 </head>
-<body id="virus-body">
+<body id="arena">
 
-    <!-- 画面中央に表示される唯一の文字（タップ後に完全に消滅します） -->
     <div class="instruction" id="tap-text">画面をタップして</div>
 
     <script>
         const chickenSounds = ['chicken1.mp3', 'chicken2.mp3', 'chicken3.mp3'];
-        const body = document.getElementById('virus-body');
+        const arena = document.getElementById('arena');
         const tapText = document.getElementById('tap-text');
         
-        let isInfected = false;
+        let isStarted = false;
+        const chickens = [];
+        const chickenSize = 60; // ニワトリの縦横サイズ
 
-        // 🌟 本家を再現した凶悪な「カラフル超高速点滅」
-        function startFlashing() {
-            const colors = ['#ff0000', '#000000', '#ffff00', '#ff0055', '#00ff00', '#0000ff', '#ffffff'];
-            setInterval(() => {
-                body.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            }, 60); // 0.06秒ごとに狂ったように背景色が変わる
-        }
-
-        // 🌟 画面中央からチキン（ファビコン画像）が無限に吹き飛び続ける
-        function spawnFlyingFavicon() {
-            const img = document.createElement('img');
-            img.src = 'chicken.ico';
-            img.className = 'flying-favicon';
-            
-            // 画面の真ん中から発生
-            img.style.left = (window.innerWidth / 2 - 25) + 'px';
-            img.style.top = (window.innerHeight / 2 - 25) + 'px';
-
-            const size = Math.floor(Math.random() * 100) + 40;
-            img.style.width = size + 'px'; img.style.height = size + 'px';
-
-            const angle = Math.random() * Math.PI * 2;
-            const distance = Math.floor(Math.random() * 500) + 300;
-            img.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
-            img.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
-            img.style.setProperty('--rot', (Math.random() * 1080 - 540) + 'deg');
-            img.style.setProperty('--scale', (Math.random() * 1.8 + 0.5));
-
-            body.appendChild(img);
-            setTimeout(() => { img.remove(); }, 1500);
-        }
-
-        // 🌟 指を動かす・マウスを動かすとチキンが弾けて大爆発
-        function createMouseExplosion(e) {
-            if (!isInfected) return;
-            
-            // タッチ操作（スマホ）とマウス操作（PC）の両方に対応
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            for (let i = 0; i < 6; i++) {
-                const particle = document.createElement('img');
-                particle.src = 'chicken.ico';
-                particle.className = 'mouse-explosion-particle';
-                particle.style.left = (clientX - 20) + 'px';
-                particle.style.top = (clientY - 20) + 'px';
-                particle.style.width = '45px';
-                particle.style.height = '45px';
-
+        // ニワトリオブジェクトのクラス定義
+        class Chicken {
+            constructor() {
+                this.element = document.createElement('img');
+                this.element.src = 'chicken.ico';
+                this.element.className = 'chicken-fighter';
+                
+                // 初期位置（画面内のランダム）
+                this.x = Math.random() * (window.innerWidth - chickenSize);
+                this.y = Math.random() * (window.innerHeight - chickenSize);
+                
+                // 移動速度と向き（ランダム）
                 const angle = Math.random() * Math.PI * 2;
-                const speed = Math.floor(Math.random() * 200) + 60;
-                particle.style.setProperty('--ex', Math.cos(angle) * speed + 'px');
-                particle.style.setProperty('--ey', Math.sin(angle) * speed + 'px');
-                particle.style.setProperty('--erot', (Math.random() * 400 - 200) + 'deg');
+                const speed = Math.random() * 4 + 3; // スピード調整
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
 
-                body.appendChild(particle);
-                setTimeout(() => { particle.remove(); }, 600);
+                arena.appendChild(this.element);
+                this.updatePosition();
+            }
+
+            // 位置を反映（向きに応じて反転させる）
+            updatePosition() {
+                this.element.style.left = this.x + 'px';
+                this.element.style.top = this.y + 'px';
+                
+                // 進む方向（左右）に合わせて画像の向きを変える
+                if (this.vx > 0) {
+                    this.element.style.transform = 'scaleX(-1)'; // 右を向く
+                } else {
+                    this.element.style.transform = 'scaleX(1)';  // 左を向く
+                }
+            }
+
+            // 移動ロジック
+            move() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 画面の端（壁）にぶつかったら跳ね返る
+                if (this.x <= 0) { this.x = 0; this.vx *= -1; }
+                if (this.x >= window.innerWidth - chickenSize) { this.x = window.innerWidth - chickenSize; this.vx *= -1; }
+                if (this.y <= 0) { this.y = 0; this.vy *= -1; }
+                if (this.y >= window.innerHeight - chickenSize) { this.y = window.innerHeight - chickenSize; this.vy *= -1; }
+
+                this.updatePosition();
             }
         }
 
-        // 🌟 チキンの鳴き声が自動で増殖・重なり続けるパンデミックオーディオ
-        function startAudioPandemic() {
-            function scheduleNextSound() {
+        // 💥 喧嘩（衝突）エフェクトを発生させて音を鳴らす関数
+        function playClash(x, y) {
+            // 衝突位置の中央に 💥 を出す
+            const clash = document.createElement('div');
+            clash.className = 'clash-effect';
+            clash.textContent = '💥';
+            clash.style.left = (x + chickenSize / 2 - 25) + 'px';
+            clash.style.top = (y + chickenSize / 2 - 25) + 'px';
+            arena.appendChild(clash);
+            setTimeout(() => clash.remove(), 300);
+
+            // 0.3秒(300ms) から 1秒(1000ms) のランダムな遅延ののち、多重再生
+            const randomDelay = Math.floor(Math.random() * (1000 - 300 + 1)) + 300;
+            setTimeout(() => {
                 const randomIndex = Math.floor(Math.random() * chickenSounds.length);
                 const audio = new Audio(chickenSounds[randomIndex]);
-                audio.volume = 1.0; 
-                audio.play().catch(err => console.log("再生制限回避"));
-
-                // 0.3秒〜1秒の間隔で次のチキンが自動予約される
-                const nextDelay = Math.floor(Math.random() * (1000 - 300 + 1)) + 300;
-                setTimeout(scheduleNextSound, nextDelay);
-            }
-            scheduleNextSound();
-            scheduleNextSound(); // 初速を上げるために2重でスタート
+                audio.play().catch(e => console.log("再生ブロック回避"));
+            }, randomDelay);
         }
 
-        // 画面のどこかを「タップ（クリック）」した瞬間に発症
-        function triggerInfection() {
-            if (isInfected) return;
-            isInfected = true;
+        // 全ニワトリの移動と「衝突判定」を行うループ（毎フレーム実行）
+        function animationLoop() {
+            // 1. 全員を動かす
+            chickens.forEach(c => c.move());
 
-            // 「画面をタップして」の文字を完全に削除して逃げ道を消す
+            // 2. 総当たりでニワトリ同士の衝突をチェック
+            for (let i = 0; i < chickens.length; i++) {
+                for (let j = i + 1; j < chickens.length; j++) {
+                    const c1 = chickens[i];
+                    const c2 = chickens[j];
+
+                    // 円形または矩形での簡易的な当たり判定
+                    const dx = (c1.x + chickenSize/2) - (c2.x + chickenSize/2);
+                    const dy = (c1.y + chickenSize/2) - (c2.y + chickenSize/2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // もし2匹の距離がサイズ以下（ぶつかった）なら
+                    if (distance < chickenSize - 10) {
+                        // 喧嘩エフェクトとサウンドをトリガー
+                        playClash((c1.x + c2.x)/2, (c1.y + c2.y)/2);
+
+                        // 反転させて跳ね返す（擬似的な物理衝突）
+                        const tempVx = c1.vx;
+                        const tempVy = c1.vy;
+                        c1.vx = c2.vx;
+                        c1.vy = c2.vy;
+                        c2.vx = tempVx;
+                        c2.vy = tempVy;
+
+                        // めり込み防止のために少し位置をずらす
+                        c1.x += c1.vx; c1.y += c1.vy;
+                        c2.x += c2.vx; c2.y += c2.vy;
+                    }
+                }
+            }
+
+            requestAnimationFrame(animationLoop);
+        }
+
+        // 画面タップで戦闘開始
+        function startChickenWar() {
+            if (isStarted) return;
+            isStarted = true;
+
+            // 文字を消す
             tapText.remove();
 
-            // 狂気の地獄絵図を一斉に解き放つ
-            body.classList.add('shaking'); // 強烈な画面振動
-            startFlashing();               // カラフル超高速点滅
-            startAudioPandemic();          // 音声自動増殖ループ
-            
-            // 0.15秒ごとに中央からチキンを大噴出
-            setInterval(spawnFlyingFavicon, 150);
+            // 最初に20匹のニワトリファイターを一気に解き放つ
+            for (let i = 0; i < 20; i++) {
+                chickens.push(new Chicken());
+            }
 
-            // PCのマウス移動と、スマホの画面スワイプ（タッチ移動）の両方に爆発をセット
-            window.addEventListener('mousemove', createMouseExplosion);
-            window.addEventListener('touchmove', createMouseExplosion);
+            // ループ処理を起動
+            requestAnimationFrame(animationLoop);
         }
 
-        // イベント登録
-        body.addEventListener('click', triggerInfection);
-        body.addEventListener('touchstart', triggerInfection);
+        arena.addEventListener('click', startChickenWar);
+        arena.addEventListener('touchstart', startChickenWar);
     </script>
 </body>
 </html>

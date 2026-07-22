@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チキン・ファイターズ</title>
+    <title>チキン・バトルロイヤル</title>
     
     <!-- 🐔 ファビコン設定 -->
     <link rel="icon" href="chicken.ico" type="image/x-icon">
     
     <style>
         body {
-            background-color: #ffe0b2; /* ケンカの舞台っぽい土・砂色のイメージ */
+            background-color: #ffe0b2;
             margin: 0;
             overflow: hidden;
             height: 100vh;
@@ -23,7 +23,6 @@
             position: relative;
         }
 
-        /* 画面をタップして */
         .instruction {
             font-size: 1.8rem;
             color: #d84315;
@@ -38,17 +37,24 @@
             100% { opacity: 0.4; }
         }
 
-        /* 走り回るニワトリ（chicken.ico）のスタイル */
         .chicken-fighter {
             position: absolute;
             width: 60px;
             height: 60px;
             z-index: 10;
             will-change: transform;
-            transition: transform 0.1s linear;
         }
 
-        /* 衝突したときに出る喧嘩エフェクト（💥） */
+        /* 5回目で画面外に吹っ飛ぶときのスピンアニメーション */
+        .blown-away {
+            animation: spinBlow 0.8s linear infinite;
+        }
+        @keyframes spinBlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(1080deg); }
+        }
+
+        /* 通常の衝突エフェクト */
         .clash-effect {
             position: absolute;
             font-size: 3rem;
@@ -56,9 +62,15 @@
             pointer-events: none;
             animation: clashPop 0.3s ease-out forwards;
         }
+        /* 5回目の特大爆発エフェクト */
+        .final-clash {
+            font-size: 5rem;
+            text-shadow: 0 0 10px #ff0000;
+            animation: clashPop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.5) forwards;
+        }
         @keyframes clashPop {
             0% { transform: scale(0.3); opacity: 1; }
-            100% { transform: scale(1.5); opacity: 0; }
+            100% { transform: scale(1.6); opacity: 0; }
         }
     </style>
 </head>
@@ -67,115 +79,163 @@
     <div class="instruction" id="tap-text">画面をタップして</div>
 
     <script>
-        const chickenSounds = ['chicken1.mp3', 'chicken2.mp3', 'chicken3.mp3'];
         const arena = document.getElementById('arena');
         const tapText = document.getElementById('tap-text');
         
         let isStarted = false;
-        const chickens = [];
-        const chickenSize = 60; // ニワトリの縦横サイズ
+        let chickens = [];
+        const chickenSize = 60;
 
-        // ニワトリオブジェクトのクラス定義
+        // 🌟 解決策：最初に3つの音源プレイヤーを固定で作成し、メモリリークを完全防止
+        const audioPool = [
+            new Audio('chicken1.mp3'),
+            new Audio('chicken2.mp3'),
+            new Audio('chicken3.mp3')
+        ];
+
         class Chicken {
             constructor() {
                 this.element = document.createElement('img');
                 this.element.src = 'chicken.ico';
                 this.element.className = 'chicken-fighter';
                 
-                // 初期位置（画面内のランダム）
                 this.x = Math.random() * (window.innerWidth - chickenSize);
                 this.y = Math.random() * (window.innerHeight - chickenSize);
                 
-                // 移動速度と向き（ランダム）
                 const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 4 + 3; // スピード調整
+                const speed = Math.random() * 3 + 2; 
                 this.vx = Math.cos(angle) * speed;
                 this.vy = Math.sin(angle) * speed;
+
+                this.isClashing = false;
+                this.clashCount = 0;
+                this.isExploded = false;
+                this.shouldRemove = false;
 
                 arena.appendChild(this.element);
                 this.updatePosition();
             }
 
-            // 位置を反映（向きに応じて反転させる）
             updatePosition() {
                 this.element.style.left = this.x + 'px';
                 this.element.style.top = this.y + 'px';
                 
-                // 進む方向（左右）に合わせて画像の向きを変える
-                if (this.vx > 0) {
-                    this.element.style.transform = 'scaleX(-1)'; // 右を向く
-                } else {
-                    this.element.style.transform = 'scaleX(1)';  // 左を向く
+                if (!this.isExploded) {
+                    if (this.vx > 0) {
+                        this.element.style.transform = 'scaleX(-1)';
+                    } else {
+                        this.element.style.transform = 'scaleX(1)';
+                    }
                 }
             }
 
-            // 移動ロジック
             move() {
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // 画面の端（壁）にぶつかったら跳ね返る
-                if (this.x <= 0) { this.x = 0; this.vx *= -1; }
-                if (this.x >= window.innerWidth - chickenSize) { this.x = window.innerWidth - chickenSize; this.vx *= -1; }
-                if (this.y <= 0) { this.y = 0; this.vy *= -1; }
-                if (this.y >= window.innerHeight - chickenSize) { this.y = window.innerHeight - chickenSize; this.vy *= -1; }
+                if (this.isExploded) {
+                    if (this.x < -100 || this.x > window.innerWidth + 100 || 
+                        this.y < -100 || this.y > window.innerHeight + 100) {
+                        this.shouldRemove = true;
+                    }
+                } else {
+                    if (this.x <= 0) { this.x = 0; this.vx *= -1; }
+                    if (this.x >= window.innerWidth - chickenSize) { this.x = window.innerWidth - chickenSize; this.vx *= -1; }
+                    if (this.y <= 0) { this.y = 0; this.vy *= -1; }
+                    if (this.y >= window.innerHeight - chickenSize) { this.y = window.innerHeight - chickenSize; this.vy *= -1; }
+                }
 
                 this.updatePosition();
             }
+
+            triggerExplosion() {
+                this.isExploded = true;
+                this.element.classList.add('blown-away');
+                
+                const angle = Math.random() * Math.PI * 2;
+                const explodeSpeed = 22; 
+                this.vx = Math.cos(angle) * explodeSpeed;
+                this.vy = Math.sin(angle) * explodeSpeed;
+            }
         }
 
-        // 💥 喧嘩（衝突）エフェクトを発生させて音を鳴らす関数
-        function playClash(x, y) {
-            // 衝突位置の中央に 💥 を出す
+        // 💥 喧嘩エフェクトと再生処理
+        function playClash(x, y, isFinal = false) {
             const clash = document.createElement('div');
-            clash.className = 'clash-effect';
-            clash.textContent = '💥';
-            clash.style.left = (x + chickenSize / 2 - 25) + 'px';
-            clash.style.top = (y + chickenSize / 2 - 25) + 'px';
+            clash.className = isFinal ? 'clash-effect final-clash' : 'clash-effect';
+            clash.textContent = isFinal ? '💥☠️💥' : '💥';
+            clash.style.left = (x - 20) + 'px';
+            clash.style.top = (y - 20) + 'px';
             arena.appendChild(clash);
-            setTimeout(() => clash.remove(), 300);
+            setTimeout(() => clash.remove(), 500);
 
-            // 0.3秒(300ms) から 1秒(1000ms) のランダムな遅延ののち、多重再生
+            // 🌟 指定秒数のランダムディレイ（0.3秒〜1秒）をかけて音を再生
             const randomDelay = Math.floor(Math.random() * (1000 - 300 + 1)) + 300;
+            
             setTimeout(() => {
-                const randomIndex = Math.floor(Math.random() * chickenSounds.length);
-                const audio = new Audio(chickenSounds[randomIndex]);
-                audio.play().catch(e => console.log("再生ブロック回避"));
+                // 3つの固定プレイヤーからランダムに1つ選ぶ（newを作らないので絶対に固まらない）
+                const randomIndex = Math.floor(Math.random() * audioPool.length);
+                const audio = audioPool[randomIndex];
+                
+                // 再生位置を強制的に先頭に戻して重ねて鳴らす
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log("再生制限回避"));
             }, randomDelay);
         }
 
-        // 全ニワトリの移動と「衝突判定」を行うループ（毎フレーム実行）
         function animationLoop() {
-            // 1. 全員を動かす
             chickens.forEach(c => c.move());
 
-            // 2. 総当たりでニワトリ同士の衝突をチェック
+            // 画面外に出たチキンを削除
+            for (let i = chickens.length - 1; i >= 0; i--) {
+                if (chickens[i].shouldRemove) {
+                    chickens[i].element.remove();
+                    chickens.splice(i, 1);
+                }
+            }
+
+            // 衝突判定
             for (let i = 0; i < chickens.length; i++) {
                 for (let j = i + 1; j < chickens.length; j++) {
                     const c1 = chickens[i];
                     const c2 = chickens[j];
 
-                    // 円形または矩形での簡易的な当たり判定
+                    if (c1.isClashing || c2.isClashing || c1.isExploded || c2.isExploded) continue;
+
                     const dx = (c1.x + chickenSize/2) - (c2.x + chickenSize/2);
                     const dy = (c1.y + chickenSize/2) - (c2.y + chickenSize/2);
                     const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    // もし2匹の距離がサイズ以下（ぶつかった）なら
-                    if (distance < chickenSize - 10) {
-                        // 喧嘩エフェクトとサウンドをトリガー
-                        playClash((c1.x + c2.x)/2, (c1.y + c2.y)/2);
+                    if (distance < chickenSize - 15) {
+                        // 0.45秒間の無敵時間を作る（連続多重衝突の防止）
+                        c1.isClashing = true;
+                        c2.isClashing = true;
 
-                        // 反転させて跳ね返す（擬似的な物理衝突）
-                        const tempVx = c1.vx;
-                        const tempVy = c1.vy;
-                        c1.vx = c2.vx;
-                        c1.vy = c2.vy;
-                        c2.vx = tempVx;
-                        c2.vy = tempVy;
+                        c1.clashCount++;
+                        c2.clashCount++;
 
-                        // めり込み防止のために少し位置をずらす
-                        c1.x += c1.vx; c1.y += c1.vy;
-                        c2.x += c2.vx; c2.y += c2.vy;
+                        const hasFinal = (c1.clashCount >= 5 || c2.clashCount >= 5);
+                        playClash((c1.x + c2.x)/2, (c1.y + c2.y)/2, hasFinal);
+
+                        if (c1.clashCount >= 5) c1.triggerExplosion();
+                        if (c2.clashCount >= 5) c2.triggerExplosion();
+
+                        if (!c1.isExploded && !c2.isExploded) {
+                            const tempVx = c1.vx;
+                            const tempVy = c1.vy;
+                            c1.vx = c2.vx;
+                            c1.vy = c2.vy;
+                            c2.vx = tempVx;
+                            c2.vy = tempVy;
+
+                            c1.x += c1.vx; c1.y += c1.vy;
+                            c2.x += c2.vx; c2.y += c2.vy;
+                        }
+
+                        setTimeout(() => {
+                            c1.isClashing = false;
+                            c2.isClashing = false;
+                        }, 450); // クールダウンを少し長め（450ms）にしてさらに安定化
                     }
                 }
             }
@@ -183,20 +243,17 @@
             requestAnimationFrame(animationLoop);
         }
 
-        // 画面タップで戦闘開始
         function startChickenWar() {
             if (isStarted) return;
             isStarted = true;
 
-            // 文字を消す
             tapText.remove();
 
-            // 最初に20匹のニワトリファイターを一気に解き放つ
+            // 20匹の大乱闘
             for (let i = 0; i < 20; i++) {
                 chickens.push(new Chicken());
             }
 
-            // ループ処理を起動
             requestAnimationFrame(animationLoop);
         }
 
